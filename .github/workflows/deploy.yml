@@ -32,7 +32,7 @@ jobs:
           aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           application_name: cognito-app-backend
-          environment_name: cognito-app-prod
+          environment_name: Cognito-app-backend-env
           version_label: ${{ steps.timestamp.outputs.time }}
           region: eu-central-1
           deployment_package: target/cognito-app-0.0.1-SNAPSHOT.jar
