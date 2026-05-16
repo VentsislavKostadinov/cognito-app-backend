@@ -22,6 +22,13 @@ jobs:
       - name: Build with Maven
         run: mvn clean package -DskipTests
       
+      - name: Create deployment package
+        run: |
+          mkdir -p deploy
+          cp target/cognito-app-0.0.1-SNAPSHOT.jar deploy/
+          cp -r .ebextensions deploy/
+          cd deploy && zip -r ../application.zip . && cd ..
+      
       - name: Get timestamp
         id: timestamp
         run: echo "time=$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
@@ -35,4 +42,4 @@ jobs:
           environment_name: cognito-app-backend-deploy
           version_label: ${{ steps.timestamp.outputs.time }}
           region: eu-central-1
-          deployment_package: target/cognito-app-0.0.1-SNAPSHOT.jar
+          deployment_package: application.zip
