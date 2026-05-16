@@ -17,7 +17,8 @@ public class WebConfig {
                         .allowedOrigins(
                                 "http://localhost:5173",
                                 "http://localhost:5174",
-                                "https://main.d16f2529r3lhi6.amplifyapp.com"
+                                "https://main.d16f2529r3lhi6.amplifyapp.com",
+                                "https://main.d2l13mf6ec69fe.amplifyapp.com"
                         )
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                         .allowedHeaders("*")
