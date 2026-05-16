@@ -28,6 +28,7 @@ jobs:
           cp target/cognito-app-0.0.1-SNAPSHOT.jar deploy/
           cp Procfile deploy/
           cp -r .ebextensions deploy/
+          cp -r .platform deploy/
           cd deploy && zip -r ../application.zip . && cd ..
       
       - name: Get timestamp
