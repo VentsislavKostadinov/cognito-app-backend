@@ -6,8 +6,10 @@ import com.example.cognito_app.dto.LoginResponse;
 import com.example.cognito_app.dto.TokenValidationRequest;
 import com.example.cognito_app.dto.TokenValidationResponse;
 import com.example.cognito_app.dto.UserInfoResponse;
+import com.example.cognito_app.dto.OAuthUrlResponse;
 import com.example.cognito_app.service.CognitoService;
 import com.example.cognito_app.service.TokenValidationService;
+import com.example.cognito_app.config.AwsCognitoConfig;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -17,6 +19,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.view.RedirectView;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -24,14 +27,16 @@ public class AuthController {
     
     private final CognitoService cognitoService;
     private final TokenValidationService tokenValidationService;
+    private final AwsCognitoConfig awsCognitoConfig;
     
     @Value("${app.environment:development}")
     private String environment;
     
     @Autowired
-    public AuthController(CognitoService cognitoService, TokenValidationService tokenValidationService) {
+    public AuthController(CognitoService cognitoService, TokenValidationService tokenValidationService, AwsCognitoConfig awsCognitoConfig) {
         this.cognitoService = cognitoService;
         this.tokenValidationService = tokenValidationService;
+        this.awsCognitoConfig = awsCognitoConfig;
     }
     
     /**
@@ -316,5 +321,77 @@ public class AuthController {
     @GetMapping("/health")
     public ResponseEntity<String> health() {
         return ResponseEntity.ok("Authentication service is running");
+    }
+    
+    /**
+     * OAuth2 authorization endpoint - generates OAuth URL for provider
+     * GET /api/auth/oauth2/authorize/{provider}
+     * @param provider The OAuth provider (e.g., "Google")
+     * @param state Optional state parameter for CSRF protection
+     * @return OAuthUrlResponse containing authorization URL
+     */
+    @GetMapping("/oauth2/authorize/{provider}")
+    public ResponseEntity<?> getOAuthUrl(
+            @PathVariable String provider,
+            @RequestParam(required = false) String state) {
+        try {
+            String authUrl = cognitoService.getOAuthAuthorizationUrl(provider, state);
+            OAuthUrlResponse response = new OAuthUrlResponse(authUrl, provider);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            ErrorResponse errorResponse = new ErrorResponse(
+                    e.getMessage(),
+                    "OAUTH_URL_GENERATION_FAILED",
+                    HttpStatus.INTERNAL_SERVER_ERROR.value()
+            );
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+    
+    /**
+     * OAuth2 callback endpoint - handles OAuth callback and exchanges code for tokens
+     * GET /api/auth/oauth2/callback
+     * @param code Authorization code from OAuth provider (optional, not present on error)
+     * @param error OAuth error code (optional, present when OAuth fails)
+     * @param errorDescription OAuth error description (optional)
+     * @param state Optional state parameter for CSRF verification
+     * @param response HttpServletResponse to set cookies
+     * @return Redirect to frontend application
+     */
+    @GetMapping("/oauth2/callback")
+    public RedirectView handleOAuthCallback(
+            @RequestParam(required = false) String code,
+            @RequestParam(required = false) String error,
+            @RequestParam(name = "error_description", required = false) String errorDescription,
+            @RequestParam(required = false) String state,
+            HttpServletResponse response) {
+        
+        String redirectUrl = awsCognitoConfig.getOauthSuccessRedirectUri();
+        
+        try {
+            // Check if OAuth provider returned an error
+            if (error != null) {
+                // Redirect to frontend with error parameter
+                return new RedirectView(redirectUrl + "?error=" + error + "&error_description=" + (errorDescription != null ? errorDescription : ""));
+            }
+            
+            // Check if code is present
+            if (code == null || code.isEmpty()) {
+                return new RedirectView(redirectUrl + "?error=missing_code");
+            }
+            
+            // Exchange authorization code for tokens
+            LoginResponse loginResponse = cognitoService.exchangeCodeForTokens(code);
+            
+            // Set HttpOnly cookies for tokens
+            setTokenCookies(response, loginResponse);
+            
+            // Redirect to frontend application (cookies are automatically sent)
+            return new RedirectView(redirectUrl);
+            
+        } catch (Exception e) {
+            // Redirect to frontend with error
+            return new RedirectView(redirectUrl + "?error=authentication_failed");
+        }
     }
 }

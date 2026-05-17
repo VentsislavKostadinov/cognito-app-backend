@@ -14,17 +14,29 @@ import software.amazon.awssdk.services.cognitoidentityprovider.model.*;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 
 @Service
 public class CognitoService {
     
     private final CognitoIdentityProviderClient cognitoClient;
     private final AwsCognitoConfig awsCognitoConfig;
+    private final HttpClient httpClient;
+    private final ObjectMapper objectMapper;
     
     @Autowired
     public CognitoService(CognitoIdentityProviderClient cognitoClient, AwsCognitoConfig awsCognitoConfig) {
         this.cognitoClient = cognitoClient;
         this.awsCognitoConfig = awsCognitoConfig;
+        this.httpClient = HttpClient.newHttpClient();
+        this.objectMapper = new ObjectMapper();
     }
     
     /**
@@ -166,6 +178,89 @@ public class CognitoService {
             return (String) claims.getClaim("email");
         } catch (Exception e) {
             return null; // Return null if email cannot be extracted
+        }
+    }
+    
+    /**
+     * Generate OAuth authorization URL for a specific provider
+     * @param provider The OAuth provider (e.g., "Google")
+     * @param state Optional state parameter for CSRF protection
+     * @return Authorization URL
+     */
+    public String getOAuthAuthorizationUrl(String provider, String state) {
+        try {
+            StringBuilder url = new StringBuilder(awsCognitoConfig.getDomain());
+            url.append("/oauth2/authorize");
+            url.append("?client_id=").append(URLEncoder.encode(awsCognitoConfig.getClientId(), StandardCharsets.UTF_8));
+            url.append("&response_type=code");
+            url.append("&scope=").append(URLEncoder.encode(awsCognitoConfig.getScope(), StandardCharsets.UTF_8));
+            url.append("&redirect_uri=").append(URLEncoder.encode(awsCognitoConfig.getOauthCallbackUri(), StandardCharsets.UTF_8));
+            url.append("&identity_provider=").append(provider);
+            
+            if (state != null && !state.isEmpty()) {
+                url.append("&state=").append(URLEncoder.encode(state, StandardCharsets.UTF_8));
+            }
+            
+            return url.toString();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to generate OAuth URL: " + e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Exchange OAuth authorization code for tokens
+     * @param code The authorization code from OAuth callback
+     * @return LoginResponse containing tokens
+     * @throws Exception if token exchange fails
+     */
+    public LoginResponse exchangeCodeForTokens(String code) throws Exception {
+        try {
+            // Prepare the token endpoint URL
+            String tokenUrl = awsCognitoConfig.getDomain() + "/oauth2/token";
+            
+            // Prepare the request body
+            String requestBody = "grant_type=authorization_code" +
+                    "&client_id=" + URLEncoder.encode(awsCognitoConfig.getClientId(), StandardCharsets.UTF_8) +
+                    "&code=" + URLEncoder.encode(code, StandardCharsets.UTF_8) +
+                    "&redirect_uri=" + URLEncoder.encode(awsCognitoConfig.getOauthCallbackUri(), StandardCharsets.UTF_8);
+            
+            // Build the HTTP request (no client secret required for this app client)
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(tokenUrl))
+                    .header("Content-Type", "application/x-www-form-urlencoded")
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                    .build();
+            
+            // Send the request
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            
+            if (response.statusCode() != 200) {
+                throw new RuntimeException("Token exchange failed with status: " + response.statusCode() + ", body: " + response.body());
+            }
+            
+            // Parse the response
+            JsonNode jsonResponse = objectMapper.readTree(response.body());
+            
+            String accessToken = jsonResponse.get("access_token").asText();
+            String idToken = jsonResponse.get("id_token").asText();
+            String refreshToken = jsonResponse.has("refresh_token") ? jsonResponse.get("refresh_token").asText() : null;
+            int expiresIn = jsonResponse.get("expires_in").asInt();
+            String tokenType = jsonResponse.get("token_type").asText();
+            
+            // Extract email from ID token
+            String email = extractEmailFromIdToken(idToken);
+            
+            return new LoginResponse(
+                    email,
+                    accessToken,
+                    idToken,
+                    refreshToken,
+                    expiresIn,
+                    tokenType
+            );
+            
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to exchange code for tokens: " + e.getMessage(), e);
         }
     }
 }

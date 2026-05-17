@@ -29,6 +29,18 @@ public class AwsCognitoConfig {
     @Value("${aws.cognito.scope}")
     private String scope;
     
+    @Value("${aws.cognito.oauth.callbackUri}")
+    private String oauthCallbackUri;
+    
+    @Value("${aws.cognito.oauth.successRedirectUri}")
+    private String oauthSuccessRedirectUri;
+    
+    @Value("${aws.cognito.google.clientId}")
+    private String googleClientId;
+    
+    @Value("${aws.cognito.google.clientSecret}")
+    private String googleClientSecret;
+    
     @Bean
     public CognitoIdentityProviderClient cognitoClient() {
         return CognitoIdentityProviderClient.builder()
@@ -60,5 +72,21 @@ public class AwsCognitoConfig {
     
     public String getRegion() {
         return region;
+    }
+    
+    public String getOauthCallbackUri() {
+        return oauthCallbackUri;
+    }
+    
+    public String getOauthSuccessRedirectUri() {
+        return oauthSuccessRedirectUri;
+    }
+    
+    public String getGoogleClientId() {
+        return googleClientId;
+    }
+    
+    public String getGoogleClientSecret() {
+        return googleClientSecret;
     }
 }
