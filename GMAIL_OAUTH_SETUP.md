@@ -13,8 +13,8 @@ The following configuration has been added to `application.properties`:
 aws.cognito.oauth.callbackUri=${AWS_COGNITO_OAUTH_CALLBACKURI:http://localhost:8080/api/auth/oauth2/callback}
 
 # Google OAuth Configuration
-aws.cognito.google.clientId=${GOOGLE_CLIENT_ID:165618029378-bh3sb365rr5qr5hriiitqojlbnff8o7c.apps.googleusercontent.com}
-aws.cognito.google.clientSecret=${GOOGLE_CLIENT_SECRET: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}
+aws.cognito.google.clientId=${GOOGLE_CLIENT_ID:YOUR-GOOGLE-CLIENT-ID}
+aws.cognito.google.clientSecret=${GOOGLE_CLIENT_SECRET:YOUR-GOOGLE-CLIENT-SECRET}
 ```
 
 ### 2. Environment Variables
@@ -22,8 +22,8 @@ Set these environment variables for production:
 
 ```bash
 export AWS_COGNITO_OAUTH_CALLBACKURI=https://your-domain.com/api/auth/oauth2/callback
-export GOOGLE_CLIENT_ID=your-client-id
-export GOOGLE_CLIENT_SECRET=your-client-secret
+export GOOGLE_CLIENT_ID=your-google-client-id
+export GOOGLE_CLIENT_SECRET=your-google-client-secret
 ```
 
 ## API Endpoints
@@ -180,8 +180,8 @@ Ensure your AWS Cognito User Pool has the following configured:
 
 ### 1. Identity Provider
 - Provider: Google
-- Client ID: `165618029378-bh3sb365rr5qr5hriiitqojlbnff8o7c.apps.googleusercontent.com`
-- Client Secret: `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`
+- Client ID: `YOUR-GOOGLE-CLIENT-ID.apps.googleusercontent.com`
+- Client Secret: `YOUR-GOOGLE-CLIENT-SECRET`
 - Authorized scopes: `profile`, `email`, `openid`
 
 ### 2. App Client Settings
